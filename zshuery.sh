@@ -242,8 +242,10 @@ fi
 # Aliases
 load_aliases() {
     alias ..='cd ..'
-    alias ....='cd ../..'
     alias la='ls -la'
+    alias ...='cd ../..'
+    alias ....='cd ../../..'
+    alias .....='cd ../../../..'
     if is_mac; then
         alias ql='qlmanage -p 2>/dev/null' # OS X Quick Look
         alias oo='open .' # open current dir in OS X Finder
