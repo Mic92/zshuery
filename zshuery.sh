@@ -24,6 +24,7 @@ load_defaults() {
     setopt prompt_subst
     setopt no_beep
     setopt auto_cd
+    setopt correct
     setopt multios
     setopt cdablevarS
     setopt transient_rprompt
@@ -107,6 +108,7 @@ COLLAPSED_DIR() { # by Steve Losh
 prompts() {
     PROMPT=$1
     RPROMPT=$2
+    SPROMPT="$fg[red]%R →$reset_color $fg[green]%r?$reset_color (Yes, No, Abort, Edit) "
 }
 prompt_char() { # by Steve Losh
     git branch >/dev/null 2>/dev/null && echo '±' && return
@@ -315,21 +317,4 @@ load_completion() {
     zstyle ':completion:*:kill:*:processes' list-colors '=(#b) #([0-9]#) ([0-9a-z-]#)*=01;34=0=01'
     zstyle ':completion:*:*:*:processes' command "ps -u `whoami` -o pid,user,comm -w -w"
 
-}
-
-# Correction
-load_correction() {
-    setopt correct_all
-    alias man='nocorrect man'
-    alias mv='nocorrect mv'
-    alias mysql='nocorrect mysql'
-    alias mkdir='nocorrect mkdir'
-    alias erl='nocorrect erl'
-    alias curl='nocorrect curl'
-    alias rake='nocorrect rake'
-    alias make='nocorrect make'
-    alias cake='nocorrect cake'
-    alias lessc='nocorrect lessc'
-    alias lunchy='nocorrect lunchy'
-    SPROMPT="$fg[red]%R →$reset_color $fg[green]%r?$reset_color (Yes, No, Abort, Edit) "
 }
