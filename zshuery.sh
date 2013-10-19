@@ -74,7 +74,9 @@ if [[ -s $HOME/.rvm/scripts/rvm ]]; then
     }
 elif [[ -d $HOME/.rbenv ]]; then
     export PATH=$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH
-    source $HOME/.rbenv/completions/rbenv.zsh
+    if [[ -f $HOME/.rbenv/completions/rbenv.zsh ]]; then
+      source $HOME/.rbenv/completions/rbenv.zsh
+    fi
     rbenv rehash 2>/dev/null
     ruby_version() { rbenv version-name }
 else
@@ -108,12 +110,17 @@ COLLAPSED_DIR() { # by Steve Losh
 prompts() {
     PROMPT=$1
     RPROMPT=$2
+    PS2=$3
     SPROMPT="$fg[red]%R →$reset_color $fg[green]%r?$reset_color (Yes, No, Abort, Edit) "
 }
 prompt_char() { # by Steve Losh
     git branch >/dev/null 2>/dev/null && echo '±' && return
     hg root >/dev/null 2>/dev/null && echo '☿' && return
-    echo '$'
+    if (( $# == 0 )); then
+      echo '$'
+    else
+      echo $1
+    fi
 }
 virtualenv_info() {
     [ $VIRTUAL_ENV ] && echo ' ('`basename $VIRTUAL_ENV`')'
@@ -289,6 +296,7 @@ load_completion() {
     fpath=($* $fpath)
     fignore=(.DS_Store $fignore)
     compinit -i
+    compdef mcd=cd
     zmodload -i zsh/complist
     setopt complete_in_word
     setopt auto_remove_slash
