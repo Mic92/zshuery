@@ -36,6 +36,7 @@ load_defaults() {
     HISTFILE=$HOME/.zsh_history
     HISTSIZE=10000
     SAVEHIST=10000
+    export WORDCHARS='*?_-.[]~=&;!#$%^(){}<>' # Like default, but without / -- ^W must be useful in paths, like it is in vim, bash, tcsh
     setopt hist_ignore_dups
     setopt hist_reduce_blanks
     setopt share_history
@@ -48,9 +49,8 @@ load_defaults() {
 }
 
 # Plug and play
-if [[ -f /etc/zsh_command_not_found ]]; then
-    source /etc/zsh_command_not_found # installed in Ubuntu
-fi
+[[ -e /etc/zsh_command_not_found ]] && source /etc/zsh_command_not_found # Debian/Ubuntu (out of the box with zsh)
+[[ -e /usr/share/doc/pkgfile/command-not-found.zsh ]] && source /usr/share/doc/pkgfile/command-not-found.zsh # Arch Linux (install the pkgfile package)
 if [[ -n ${commands[hub]} ]]; then
     function git(){hub $@}
 fi
@@ -60,10 +60,10 @@ if [[ -n ${commands[jump]} ]]; then
     }
     alias j="jump -a"
 fi
-if [[ -d /var/lib/gems/1.8/bin ]]; then # oh Debian/Ubuntu
-    export PATH=$PATH:/var/lib/gems/1.8/bin
-fi
+[[ -d /var/lib/gems/1.8/bin ]] && export PATH=$PATH:/var/lib/gems/1.8/bin # oh Debian/Ubuntu
 # RVM or rbenv
+export RBENV_ROOT=$HOME/.rbenv
+[[ -d /usr/local/var/rbenv ]] && export RBENV_ROOT=/usr/local/var/rbenv
 if [[ -s $HOME/.rvm/scripts/rvm ]]; then
     source $HOME/.rvm/scripts/rvm
     RUBY_VERSION_PREFIX='r'
@@ -72,20 +72,22 @@ if [[ -s $HOME/.rvm/scripts/rvm ]]; then
             echo $RUBY_VERSION_PREFIX$RUBY_VERSION | sed s/ruby-//
         else echo ''; fi
     }
-elif [[ -d $HOME/.rbenv ]]; then
-    export PATH=$HOME/.rbenv/bin:$HOME/.rbenv/shims:$PATH
-    if [[ -f $HOME/.rbenv/completions/rbenv.zsh ]]; then
-      source $HOME/.rbenv/completions/rbenv.zsh
-    fi
-    rbenv rehash 2>/dev/null
+elif [[ -d $RBENV_ROOT ]]; then
+    export PATH=$PATH:$RBENV_ROOT/bin
+    eval "$(rbenv init -)"
     ruby_version() { rbenv version-name }
 else
     ruby_version() { echo '' }
 fi
-# Current directory in title
+# Current directory in title / iTerm semantic history (click on filename to open)
 if [[ $TERM_PROGRAM == "Apple_Terminal" ]]; then
     update_terminal_cwd() {
         printf '\e]7;%s\a' "file://$HOST$(pwd | sed -e 's/ /%20/g')"
+    }
+elif [[ $TERM_PROGRAM == "iTerm.app" ]]; then
+    # Only works without tmux or with integrated tmux
+    update_terminal_cwd() {
+        printf '\e]50;CurrentDir=%s\a' "$(pwd)"
     }
 else
     case $TERM in
@@ -116,12 +118,14 @@ prompts() {
 prompt_char() { # by Steve Losh
     git branch >/dev/null 2>/dev/null && echo '±' && return
     hg root >/dev/null 2>/dev/null && echo '☿' && return
+    bzr root >/dev/null 2>/dev/null && echo '↥' && return
     if (( $# == 0 )); then
       echo '$'
     else
       echo $1
     fi
 }
+
 virtualenv_info() {
     [ $VIRTUAL_ENV ] && echo ' ('`basename $VIRTUAL_ENV`')'
 }
@@ -167,10 +171,12 @@ urldecode() { python -c "import sys, urllib as ul; print ul.unquote_plus(sys.arg
 path() {
   echo $PATH | tr ":" "\n" | \
     awk "{ sub(\"/usr\",   \"$fg_no_bold[green]/usr$reset_color\"); \
-           sub(\"/bin\",   \"$fg_no_bold[blue]/bin$reset_color\"); \
-           sub(\"/opt\",   \"$fg_no_bold[cyan]/opt$reset_color\"); \
-           sub(\"/sbin\",  \"$fg_no_bold[magenta]/sbin$reset_color\"); \
+           sub(\"/bin\",   \"$fg_bold[blue]/bin$reset_color\"); \
+           sub(\"/sbin\",  \"$fg_bold[magenta]/sbin$reset_color\"); \
            sub(\"/local\", \"$fg_no_bold[yellow]/local$reset_color\"); \
+           sub(\"/opt\",   \"$fg_no_bold[cyan]/opt$reset_color\"); \
+           sub(\"/Users\", \"$fg_no_bold[red]/Users$reset_color\"); \
+           sub(\"/home\",  \"$fg_no_bold[red]/home$reset_color\"); \
            print }"
 }
 up() { # https://gist.github.com/1474072
@@ -186,16 +192,7 @@ up() { # https://gist.github.com/1474072
     done
     test $DIR != "/" && echo $DIR/$TARGET
 }
-if has_brew; then
-    gimme() { brew install $1 }
-    _gimme() { reply=(`brew search`) }
-elif has_apt; then
-    gimme() { sudo apt-get install $1 }
-elif has_yum; then
-    gimme() { su -c 'yum install $1' }
-fi
 if is_mac; then
-    pman() { man $1 -t | open -f -a Preview } # open man pages in Preview
     cdf() { eval cd "`osascript -e 'tell app "Finder" to return the quoted form of the POSIX path of (target of window 1 as alias)' 2>/dev/null`" }
     vol() {
         if [[ -n $1 ]]; then osascript -e "set volume output volume $1"
@@ -208,12 +205,6 @@ if is_mac; then
         else msg=$(cat | sed -e 's/\\/\\\\/g' -e 's/\"/\\\"/g')
         fi
         osascript -e 'tell application "Mail" to make new outgoing message with properties { Content: "'$msg'", visible: true }' -e 'tell application "Mail" to activate'
-    }
-    sparrow() {
-        if [[ -n $1 ]]; then msg=$1
-        else msg=$(cat | sed -e 's/\\/\\\\/g' -e 's/\"/\\\"/g')
-        fi
-        osascript -e 'tell application "Sparrow" to compose (make new outgoing message with properties { content: "'$msg'" })' -e 'tell application "Sparrow" to activate'
     }
     evernote() {
         if [[ -n $1 ]]; then msg=$1
@@ -259,7 +250,6 @@ load_aliases() {
         alias ql='qlmanage -p 2>/dev/null' # OS X Quick Look
         alias oo='open .' # open current dir in OS X Finder
     fi
-    alias clr='clear'
     alias s_http='python -m SimpleHTTPServer' # serve current folder via HTTP
     alias s_smtp='python -m smtpd -n -c DebuggingServer localhost:1025' # SMTP test server, outputs to console
     alias wget='wget --no-check-certificate'
@@ -293,15 +283,14 @@ load_completion() {
     # http://www.reddit.com/r/commandline/comments/kbeoe/you_can_make_readline_and_bash_much_more_user/
     # https://wiki.archlinux.org/index.php/Zsh
     autoload -U compinit
-    fpath=($* $fpath)
+    fpath=($* "/usr/local/share/zsh/site-functions" $fpath)
     fignore=(.DS_Store $fignore)
     compinit -i
     compdef mcd=cd
     zmodload -i zsh/complist
     setopt complete_in_word
-    setopt auto_remove_slash
     unsetopt always_to_end
-    has_brew && compctl -K _gimme gimme
+    [[ -f /usr/local/share/zsh/site-functions/go ]] && source /usr/local/share/zsh/site-functions/go # is not autoloadable from fpath
     [[ -f ~/.ssh/known_hosts ]] && hosts=(`awk '{print $1}' ~/.ssh/known_hosts | tr ',' '\n' `)
     [[ -f ~/.ssh/config ]] && hosts=($hosts `grep '^Host' ~/.ssh/config | sed s/Host\ // | egrep -v '^\*$'`)
     [[ -f /var/lib/misc/ssh_known_hosts ]] && hosts=($hosts `awk -F "[, ]" '{print $1}' /var/lib/misc/ssh_known_hosts | sort -u`)
@@ -311,7 +300,7 @@ load_completion() {
     highlights2='=(#bi) #([0-9]#) #([^ ]#) #([^ ]#) ##*($PREFIX)*==1;31=1;35=1;33=1;32=}'
     zstyle -e ':completion:*' list-colors 'if [[ $words[1] != kill && $words[1] != strace ]]; then reply=( "'$highlights'" ); else reply=( "'$highlights2'" ); fi'
     unset highlights
-    zstyle ':completion:*' completer _complete _match _approximate
+    # zstyle ':completion:*' completer _complete _match _approximate
     zstyle ':completion:*' squeeze-slashes true
     zstyle ':completion:*' expand 'yes'
     zstyle ':completion:*:match:*' original only
@@ -324,5 +313,4 @@ load_completion() {
     zstyle ':completion:*:ogg123:*' file-patterns '*.(ogg|OGG):ogg\ files *(-/):directories'
     zstyle ':completion:*:kill:*:processes' list-colors '=(#b) #([0-9]#) ([0-9a-z-]#)*=01;34=0=01'
     zstyle ':completion:*:*:*:processes' command "ps -u `whoami` -o pid,user,comm -w -w"
-
 }
